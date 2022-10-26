@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Simple example for ZipStore.js</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            textarea,input[type="text"]{width: 95%;}
+            canvas{border: solid;}
+        </style>
+        <script src="zipstore.js"></script>
+        <script>
+            const content = [];
+            function forcext(event) {
+                const name = event.target.value;
+                const pos = name.lastIndexOf(".");
+                event.target.value = pos > 0 ? name.substring(0, pos) + ".zip" : name + ".zip";
+            }
+            function text() {
+                const filename = document.createElement("input");
+                filename.type = "text";
+                filename.value = `${content.length + 1}.txt`;
+                const textarea = document.createElement("textarea");
+                textarea.rows = 10;
+                document.body.insertBefore(textarea, document.getElementById("bottom"));
+                document.body.insertBefore(filename, textarea);
+                content.push([filename, new Date(), textarea]);
+            }
+            function image() {
+                const filename = document.createElement("input");
+                filename.type = "text";
+                filename.value = `${content.length + 1}.png`;
+                const color = document.createElement("input");
+                color.type = "color";
+                const cnv = document.createElement("canvas");
+                const ctx = cnv.getContext("2d");
+                ctx.fillStyle = "white";
+                ctx.fillRect(0, 0, cnv.width, cnv.height);
+                let draw = false;
+                cnv.onmousemove = event => {
+                    if (!draw)
+                        return;
+                    ctx.strokeStyle = ctx.fillStyle = color.value;
+                    ctx.beginPath();
+                    ctx.arc(event.offsetX, event.offsetY, 5, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                };
+                cnv.onmousedown = event => {
+                    draw = true;
+                    cnv.onmousemove(event);
+                };
+                cnv.onmouseup = cnv.onmouseout = () => {
+                    draw = false;
+                };
+                const br1 = document.createElement("br");
+                const br2 = document.createElement("br");
+                document.body.insertBefore(cnv, document.getElementById("bottom"));
+                document.body.insertBefore(br2, cnv);
+                document.body.insertBefore(color, br2);
+                document.body.insertBefore(br1, color);
+                document.body.insertBefore(filename, br1);
+                content.push([filename, new Date(), cnv]);
+            }
+            async function getzip() {
+                const te = new TextEncoder();
+                const blob = zipstore(await Promise.all(content.map(
+                    item => item[2] instanceof HTMLTextAreaElement ? {
+                        name: item[0].value,
+                        date: item[1],
+                        data: te.encode(item[2].value)
+                    } : new Promise(resolve => item[2].toBlob(blob => resolve(blob.arrayBuffer())))
+                            .then(buffer => ({
+                                    name: item[0].value,
+                                    date: item[1],
+                                    data: new Uint8Array(buffer)
+                                }))
+                )));
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = document.getElementById("zipname").value;
+                a.click();
+                URL.revokeObjectURL(url);
+            }
+        </script>
+    </head>
+    <body>
+        <input type="text" id="zipname" placeholder="filename.zip" value="filename.zip" oninput="forcext(event)">
+        <hr>
+        <hr id="bottom">
+        <button onclick="text()">Add text</button>
+        <button onclick="image()">Add image</button>
+        <button onclick="getzip()">Zip</button>
+    </body>
+</html>
